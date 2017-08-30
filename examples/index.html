@@ -1,1 +1,423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+    <title>jQuery FaceDetection Examples</title>
+    <!-- <link rel="stylesheet" href="css/styles.css"> -->
+    <style>
+			
+	.picture-container {
+            position: relative;
+			text-align: center;
+			display: inline-block;
+            width: auto;
+            /*height: auto;*/
+            /*margin: 20px auto;*/
+            /*border: 10px solid #fff;
+            box-shadow: 0 5px 5px #000;*/
+        }
+            .picture {
+                display: block;
+                /*width: 100%;*/
+                /*height: auto;*/
+            }
+            
+        .face {
+            position: absolute;
+            /*border: 2px solid #FFF;*/
+        }
+		
+	@media (max-width: 700px) {
+		#img-out canvas{
+			width: 100%;
+		}
+	}	
+</style>
+</head>
+<body>
+  
+    <div class="picture-container">
+		<canvas id="group_pic" class="picture" width = "600" height="337"></canvas>
+	</div>
+	<div class="clear"></div>
+	<div id="img-out"></div>
+	<div id="btns">
+		<button class = "btn btn-success" style="text-align:center;float: left;margin-right:10px" type="button" id="try-it">Click</button>
+		<input style="text-align: center;float: left" type="file" id="files" name="files[]" />
+		<button class="btn btn-success" style="float: left" onclick="saveImg()">Save</button>	
+	</div>
+	<div id="output_btns" style="display: none">
+		<button class="btn btn-success" style="float: left" onclick="window.location = window.location">Try Again</button>
+	</div>
 
+    <!-- <script src="https://code.jquery.com/jquery-3.1.1.min.js"></script> -->
+	<script src="./js/libs/jquery-3.1.1.js"></script>
+    <script src="../dist/jquery.facedetection.js"></script> 
+	
+	<script src="./js/libs/utils.js"></script>
+	<script src="./js/libs/dat.gui.min.js"></script>
+	<script src="../clmtrackr_group.js"></script>
+	<script src="../models/model_pca_20_svm.js"></script>
+	<!-- <script src="./js/libs/Stats.js"></script> =-->
+	
+	<link rel="stylesheet" type="text/css" href="./styles/imgareaselect-default.css" />
+	<!--<script src="./js/libs/jquery.min.js"></script> -->
+	<script src="./js/libs/jquery.imgareaselect.pack.js"></script>
+	<script src="./js/libs/BlobBuilder.min.js"></script>
+	<script src="./js/libs/Filesaver.min.js"></script>
+	
+	<script src="./js/libs/html2canvas.js"></script>
+	<script src="./js/libs/canvas2image.js"></script>
+	
+	
+    <script>
+        /* global $ */
+			
+		var cc = document.getElementById('group_pic').getContext('2d');
+			
+		var ctrack = new clm.tracker({stopOnConvergence : true});
+		ctrack.init(pModel);
+		
+		var img = new Image();
+			img.onload = function() {
+				cc.drawImage(img,0,0,600, 337);
+			};
+			
+			img.src = 'images/default.jpg';
+			
+		
+		var drawRequest;
+		
+        $(function () {
+            //"use strict";
+            
+            $('#try-it').click(function (e) {
+                e.preventDefault();
+
+                mapImages();
+				setTimeout(function() { saveImg(); }, 5000);
+				
+            });
+			
+			
+        });
+		
+		function isCanvasBlank(canvas) {
+			var blank = document.createElement('canvas');
+			blank.width = canvas.width;
+			blank.height = canvas.height;
+
+			return canvas.toDataURL() == blank.toDataURL();
+		}
+		
+		// detect if tracker fails to find a face
+		document.addEventListener("clmtrackrNotFound", function(event) {
+			ctrack.stop();
+			//alert("The tracking had problems with finding a face in this image. ")
+		}, false);
+		
+		// detect if tracker loses tracking of face
+		document.addEventListener("clmtrackrLost", function(event) {
+			ctrack.stop();
+			//alert("The tracking had problems converging on a face in this image. ")
+		}, false);
+		
+		// detect if tracker has converged
+		document.addEventListener("clmtrackrConverged", function(event) {
+			//document.getElementById('convergence').innerHTML = "CONVERGED";
+			//document.getElementById('convergence').style.backgroundColor = "#00FF00";
+			// stop drawloop
+			cancelRequestAnimFrame(drawRequest);
+			//ctrack.reset();
+			//alert('test');
+		}, false);
+		
+		/*$(document).one("click", "#try-it", function(){
+					
+				});*/
+			
+		function mapImages()
+		{
+			$('.face').remove();
+			//alert('test');
+				
+			$('#group_pic').faceDetection({
+				complete: function (faces) {   
+					  //console.log(faces);    	
+					var imgArr = new Array();
+					for (var i = 0; i < faces.length; i++) {
+						
+						var f_x = ((faces[i].x * faces[i].scaleX) - 35);
+						var f_y = ((faces[i].y * faces[i].scaleY) - 35);
+						var f_w = faces[i].width  * faces[i].scaleX + 70; 
+						var f_h = faces[i].height * faces[i].scaleY + 70;
+													
+						$('<canvas >', {
+							'class':'face overlay_face overlay_face_' + i,
+							'id': 'overlay_face_' + i,							
+							'css': {
+								'position': 'absolute',
+								'left':     f_x + 'px',
+								'top':      f_y + 'px',
+								'width':    f_w + 'px',
+								'height':   f_h + 'px',
+								'margin' : '0 !important',
+								'padding' : '0 !important'
+							}
+						})
+						.insertAfter(this);
+						
+						$('#overlay_face_' + i).attr('width',f_w);
+						$('#overlay_face_' + i).attr('height',f_h);
+						
+						$('<canvas >', {
+							'class':'face selected_face selected_face_' + i,
+							'id': 'selected_face_' + i,
+							'css': {
+								'position': 'absolute',
+								'left':     f_x + 'px',
+								'top':      f_y + 'px',
+								'width':    f_w + 'px',
+								'height':   f_h + 'px',
+								'margin' : '0 !important',
+								'padding' : '0 !important'
+							}
+						})
+						.insertAfter(this);
+						
+						$('#selected_face_' + i).attr('width',f_w);
+						$('#selected_face_' + i).attr('height',f_h);
+						
+						var imgID = 'selected_face_' + i;
+						var overlayID = 'overlay_face_' + i;
+						
+						var c = document.getElementById("group_pic");
+						var ctx = c.getContext("2d");
+						
+						//ctrack.reset();
+						
+						var imgData = ctx.getImageData(f_x, f_y, f_w, f_h);
+						
+						var s = document.getElementById(imgID);
+						var stx = s.getContext("2d");
+						stx.putImageData(imgData, 0, 0);
+						
+						var blank = isCanvasBlank(document.getElementById("selected_face_"+i));
+						if(blank == false)
+						{
+							
+							//box = [0, 0, f_w, f_h];
+							ctrack.reset();
+							animateClean(imgID,overlayID);
+							
+							var ovblank = isCanvasBlank(document.getElementById(overlayID));
+							if(ovblank == false)
+							{
+								var ov = document.getElementById(overlayID);						
+								ctx.drawImage(ov,f_x,f_y);
+							}
+							
+							
+						}
+						
+						$('#selected_face_' + i).remove();
+						
+							
+						
+					}
+					
+					//trackImgs(i);
+				},
+				error:function (code, message) {
+					alert('Error: ' + message);
+				}
+			});
+			
+		}
+		
+		/*function trackImgs(cnt)
+		{
+			for (var i = 0; i < cnt; i++) {
+				var imgID = 'selected_face_' + i;
+				var overlayID = 'overlay_face_' + i;
+				var blank = isCanvasBlank(document.getElementById("selected_face_"+i));
+				if(blank == false)
+					animateClean(imgID,overlayID);
+			}	
+			
+		}*/
+		
+		function animateClean(imgID,overlayID) {
+			ctrack.start(document.getElementById(imgID));
+			var a = ctrack.getCurrentPosition();
+			if( a == false || a == '')
+			{			
+				ctrack.track(document.getElementById(imgID));
+			}	
+			
+			drawLoop(imgID,overlayID);		
+		}
+
+		function animate(box,imgID,overlayID) {
+			ctrack.start(document.getElementById(imgID), box);
+			
+			drawLoop(imgID,overlayID);
+		}
+		
+		function drawLoop(imgID,overlayID) {
+			if($('#' + overlayID).length > 0)
+			{
+				//drawRequest = requestAnimFrame(drawLoop);
+							
+				var overlay = document.getElementById(overlayID);
+				var overlayCC = overlay.getContext('2d');
+				overlayCC.clearRect(0, 0, 100, 100);
+								
+				if(ctrack.getCurrentPosition()){
+					
+					ctrack.draw(overlay);				
+				}
+			}
+			
+		}
+		
+		// function to start showing images
+		function loadImage() {
+			
+			if (fileList.indexOf(fileIndex) < 0) {
+				var reader = new FileReader();
+				reader.onload = (function(theFile) {
+					
+					return function(e) {
+						// check if positions already exist in storage
+					
+						// Render thumbnail.
+						var canvas = document.getElementById('group_pic')
+						var cc = canvas.getContext('2d');
+						var img = new Image();
+						img.onload = function() {
+							clearCanvass();
+							//cc.drawImage(img,0,0,canvas.width, canvas.height);
+							if (img.height > 500 || img.width > 700) {
+								var rel = img.height/img.width;
+								var neww = 700;
+								var newh = neww*rel;
+								if (newh > 500) {
+									newh = 500;
+									neww = newh/rel;
+								}
+								canvas.setAttribute('width', neww);
+								canvas.setAttribute('height', newh);
+								cc.drawImage(img,0,0,neww, newh);
+							} else {
+								canvas.setAttribute('width', img.width);
+								canvas.setAttribute('height', img.height);
+								cc.drawImage(img,0,0,img.width, img.height);
+							}
+							
+							mapImages();
+							//$('.picture-container').hide();
+							$('#btns').html('Please wait while we process');
+							
+							setTimeout(function() { saveImg(); }, 5000);
+						}
+						
+						img.src = e.target.result;
+						
+						
+					};
+				})(fileList[fileIndex]);
+				
+				reader.readAsDataURL(fileList[fileIndex]);
+				//ctrack.reset();
+				
+				
+				
+			}
+			
+		}
+
+		// set up file selector and variables to hold selections
+		var fileList, fileIndex;
+		if (window.File && window.FileReader && window.FileList) {
+			function handleFileSelect(evt) {
+				var files = evt.target.files;
+				fileList = [];
+				for (var i = 0;i < files.length;i++) {
+					if (!files[i].type.match('image.*')) {
+						continue;
+					}
+					fileList.push(files[i]);
+				}
+				if (files.length > 0) {
+					fileIndex = 0;
+				}
+				
+				clearCanvass();
+				loadImage();
+				//$('#try-it').trigger('click').delay(1000);
+				//mapImages();
+			}
+			document.getElementById('files').addEventListener('change', handleFileSelect, false);
+		} else {
+			$('#files').addClass("hide");
+			$('#loadimagetext').addClass("hide");
+		}
+				
+		function clearCanvass()
+		{
+			$('.face').each(function(){
+				var thisID = $(this).attr('id');
+				var overlay = document.getElementById(thisID);
+				var overlayCC = overlay.getContext('2d');
+				overlayCC.clearRect(0, 0, 100, 100);
+			});
+			
+		}
+		
+		function saveImg()
+		{
+			
+			html2canvas($(".picture-container"), {
+				onrendered: function(canvas) {
+					//theCanvas = canvas;
+					//document.body.appendChild(canvas);
+
+					// Convert and download as image 
+					//Canvas2Image.saveAsPNG(canvas); 
+					var image = Canvas2Image.convertToPNG(canvas);
+					var image_data = $(image).attr('src');
+					//alert(image_data);
+					
+					$("#img-out").append(canvas);
+					$('.picture-container').hide();
+					$('#btns').hide();
+					$('#output_btns').show();
+					/*var dataURL = canvas.toDataURL('image/png');
+										
+					$.ajax({
+					  type: "POST",
+					  url: siteURL + "admin/upload_faces",
+					  data: { 
+						 imgBase64: dataURL
+					  },
+					  success: function(){
+						  
+					  }
+					});*/
+					/*.done(function(o) {
+					  console.log('saved'); 
+					  // If you want the file to be visible in the browser 
+					  // - please modify the callback in javascript. All you
+					  // need is to return the url to the file, you just saved 
+					  // and than put the image in your browser.
+					});*/
+					// Clean up 
+					//document.body.removeChild(canvas);
+				}
+			});
+		}		
+    </script>
+</body>
+</html>
